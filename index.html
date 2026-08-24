@@ -1,0 +1,667 @@
+<title>Mayos Morales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Barlow+Condensed:wght@400;500;600;700&family=Chivo:wght@400;700&display=swap">
+<style>
+  :root{
+    --ink:#080B16;
+    --smog:#1A2340;
+    --steel:#3A4468;
+    --red:#E11D3C;
+    --red-hot:#FF3355;
+    --venom:#37E6FF;
+    --gold:#FFC46B;
+    --amber:#FF9B21;
+    --paper:#EDEFF7;
+    --mute:#8791AE;
+    --display:"Bungee","Impact",sans-serif;
+    --ui:"Barlow Condensed","Oswald",sans-serif;
+    --body:"Chivo",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--ink);
+    color:var(--paper);
+    font-family:var(--body);
+    overflow:hidden;
+    -webkit-user-select:none;user-select:none;
+    touch-action:none;
+  }
+  #stage{position:fixed;inset:0;overflow:hidden}
+  canvas{display:block;width:100%;height:100%;cursor:crosshair}
+
+  /* ---------- HUD ---------- */
+  #hud{position:absolute;inset:0;pointer-events:none;font-family:var(--ui)}
+  .panel{position:absolute;display:flex;flex-direction:column;gap:6px}
+  .label{
+    font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--mute);font-weight:600;
+  }
+  .meter{
+    width:210px;height:7px;background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.14);position:relative;overflow:hidden;
+  }
+  .meter i{position:absolute;inset:0 100% 0 0;display:block;transition:right .18s ease-out}
+  #healthFill{background:linear-gradient(90deg,#8E0F26,var(--red-hot));box-shadow:0 0 12px rgba(225,29,60,.6)}
+  #venomFill{background:linear-gradient(90deg,#0E7C93,var(--venom));box-shadow:0 0 12px rgba(55,230,255,.55)}
+  #trustFill{background:linear-gradient(90deg,#7A5410,var(--gold));box-shadow:0 0 12px rgba(255,196,107,.45)}
+
+  #topLeft{top:20px;left:20px}
+  #tag{font-family:var(--display);font-size:17px;letter-spacing:.02em;line-height:1;color:var(--paper);
+       text-shadow:0 0 18px rgba(225,29,60,.55)}
+  #tag em{font-style:normal;color:var(--red-hot)}
+
+  #topRight{top:20px;right:20px;align-items:flex-end;text-align:right}
+  #score{font-size:40px;font-weight:700;line-height:.9;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+  #combo{
+    font-family:var(--display);font-size:15px;color:var(--venom);
+    opacity:0;transform:scale(.7);transition:opacity .12s,transform .12s;
+    text-shadow:0 0 16px rgba(55,230,255,.8);
+  }
+  #combo.on{opacity:1;transform:scale(1)}
+  #speed{font-size:13px;letter-spacing:.18em;color:var(--mute);font-variant-numeric:tabular-nums}
+
+  #botLeft{bottom:22px;left:20px}
+  #stats{font-size:13px;letter-spacing:.14em;color:var(--mute);font-variant-numeric:tabular-nums}
+  #stats b{color:var(--paper);font-weight:600}
+
+  #botRight{bottom:22px;right:20px;align-items:flex-end;text-align:right}
+  #keys{font-size:12px;letter-spacing:.1em;color:var(--mute);line-height:1.7}
+  #keys k{
+    display:inline-block;min-width:20px;padding:0 5px;margin-right:6px;
+    border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);
+    color:var(--paper);font-weight:600;text-align:center;
+  }
+
+  #prompt{
+    position:absolute;left:50%;bottom:112px;transform:translateX(-50%);
+    font-family:var(--display);font-size:15px;letter-spacing:.02em;
+    color:var(--ink);background:var(--gold);padding:7px 16px;
+    opacity:0;transition:opacity .14s;box-shadow:0 6px 30px rgba(255,196,107,.35);
+  }
+  #prompt.on{opacity:1}
+
+  #alert{
+    position:absolute;top:76px;left:50%;transform:translate(-50%,-24px);
+    opacity:0;transition:opacity .3s,transform .3s;text-align:center;
+  }
+  #alert.on{opacity:1;transform:translate(-50%,0)}
+  #alert .kicker{font-size:12px;letter-spacing:.4em;color:var(--amber);font-weight:700}
+  #alert .what{font-family:var(--display);font-size:26px;letter-spacing:.01em;
+    text-shadow:0 0 26px rgba(255,155,33,.6);margin-top:2px}
+
+  #toasts{position:absolute;left:50%;top:46%;transform:translateX(-50%);
+    display:flex;flex-direction:column;align-items:center;gap:4px}
+  .toast{
+    font-family:var(--display);font-size:22px;color:var(--venom);
+    text-shadow:0 0 22px rgba(55,230,255,.7);
+    animation:pop .9s ease-out forwards;
+  }
+  .toast.gold{color:var(--gold);text-shadow:0 0 22px rgba(255,196,107,.7)}
+  .toast.red{color:var(--red-hot);text-shadow:0 0 22px rgba(255,51,85,.7)}
+  @keyframes pop{
+    0%{opacity:0;transform:translateY(14px) scale(.8)}
+    18%{opacity:1;transform:translateY(0) scale(1.06)}
+    30%{transform:scale(1)}
+    100%{opacity:0;transform:translateY(-34px) scale(1)}
+  }
+
+  /* radar strip */
+  #radar{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);
+    width:min(46vw,520px);height:26px;border:1px solid rgba(255,255,255,.16);
+    background:rgba(10,14,26,.6);overflow:hidden}
+  #radar canvas{width:100%;height:100%;cursor:default}
+
+  /* ---------- overlays ---------- */
+  .screen{
+    position:absolute;inset:0;display:grid;place-items:center;
+    background:radial-gradient(120% 90% at 50% 40%,rgba(26,35,64,.86),rgba(8,11,22,.96));
+    backdrop-filter:blur(3px);pointer-events:auto;
+  }
+  .screen[hidden]{display:none}
+  .card{
+    width:min(560px,92vw);border:2px solid var(--paper);background:var(--ink);
+    padding:30px 32px 26px;position:relative;
+    box-shadow:0 30px 90px rgba(0,0,0,.7), 10px 10px 0 rgba(225,29,60,.9);
+  }
+  .card:before{
+    content:"";position:absolute;inset:6px;border:1px solid rgba(237,239,247,.22);pointer-events:none;
+  }
+  .eyebrow{font-family:var(--ui);font-size:12px;letter-spacing:.42em;color:var(--amber);font-weight:700}
+  h1{font-family:var(--display);font-size:clamp(34px,7vw,54px);line-height:.92;margin:10px 0 4px;
+     letter-spacing:.01em;text-wrap:balance}
+  h1 span{color:var(--red-hot);text-shadow:0 0 30px rgba(225,29,60,.6)}
+  .sub{font-family:var(--ui);font-size:16px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
+  .rule{height:2px;background:var(--paper);margin:18px 0 16px;opacity:.85}
+  .ctrls{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-family:var(--ui);font-size:15px;
+    letter-spacing:.06em;color:var(--paper)}
+  .ctrls dt{color:var(--venom);font-weight:700;white-space:nowrap}
+  .ctrls dd{margin:0;color:var(--mute)}
+  .go{
+    margin-top:22px;width:100%;font-family:var(--display);font-size:19px;padding:13px;
+    background:var(--red);color:#fff;border:0;cursor:pointer;letter-spacing:.02em;
+    transition:transform .1s,background .15s;
+  }
+  .go:hover,.go:focus-visible{background:var(--red-hot);transform:translateY(-2px)}
+  .go:focus-visible{outline:3px solid var(--venom);outline-offset:3px}
+  .fine{margin-top:12px;font-size:12.5px;color:var(--mute);font-family:var(--body);line-height:1.6}
+  .tally{display:flex;gap:26px;margin:16px 0 4px;font-family:var(--ui)}
+  .tally div{display:flex;flex-direction:column}
+  .tally b{font-size:30px;font-variant-numeric:tabular-nums;line-height:1}
+  .tally span{font-size:11px;letter-spacing:.2em;color:var(--mute)}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div class="panel" id="topLeft">
+      <div id="tag">MAYOS <em>MORALES</em></div>
+      <div class="label">Vitals</div>
+      <div class="meter"><i id="healthFill"></i></div>
+      <div class="label">Venom Charge</div>
+      <div class="meter"><i id="venomFill"></i></div>
+    </div>
+
+    <div class="panel" id="topRight">
+      <div class="label">Score</div>
+      <div id="score">0</div>
+      <div id="combo">×1</div>
+      <div id="speed">0 MPH</div>
+    </div>
+
+    <div class="panel" id="botLeft">
+      <div class="label">City Trust</div>
+      <div class="meter"><i id="trustFill"></i></div>
+      <div id="stats">CRIMES STOPPED <b id="stopped">0</b> &nbsp;·&nbsp; THUGS DOWN <b id="downed">0</b></div>
+    </div>
+
+    <div class="panel" id="botRight">
+      <div id="keys">
+        <div><k>LMB</k>web / yank &nbsp; <k>RMB</k>zip</div>
+        <div><k>A</k><k>D</k>steer &nbsp; <k>W</k><k>S</k>reel &nbsp; <k>SPC</k>jump</div>
+        <div><k>F</k>grapple &nbsp; <k>E</k>venom &nbsp; <k>P</k>pause</div>
+      </div>
+    </div>
+
+    <div id="alert"><div class="kicker">CRIME IN PROGRESS</div><div class="what">MUGGING</div></div>
+    <div id="prompt">F — TAKEDOWN</div>
+    <div id="toasts"></div>
+    <div id="radar"><canvas id="radarCv"></canvas></div>
+  </div>
+
+  <div class="screen" id="titleScreen">
+    <div class="card">
+      <div class="eyebrow">BROOKLYN · 7:41 PM</div>
+      <h1>MAYOS <span>MORALES</span></h1>
+      <div class="sub">Web-slinger of New York City</div>
+      <div class="rule"></div>
+      <dl class="ctrls">
+        <dt>HOLD LMB</dt><dd>Shoot web at a building and swing — aim with the mouse</dd>
+        <dt>LMB on a thug</dt><dd>Yank them off their feet from across the street</dd>
+        <dt>RMB</dt><dd>Zip-line — rocket toward whatever you're aiming at</dd>
+        <dt>W / S</dt><dd>Reel the web in or let it out mid-swing</dd>
+        <dt>A / D</dt><dd>Steer in the air, run on rooftops, climb walls</dd>
+        <dt>SPACE</dt><dd>Jump, wall-jump, or release the web with a boost</dd>
+        <dt>F</dt><dd>Grapple takedown — or dive in fast for a slam</dd>
+        <dt>E</dt><dd>Venom strike when the blue bar is full</dd>
+      </dl>
+      <button class="go" id="startBtn">SWING OUT</button>
+      <p class="fine">Crimes flare up along the street as amber light columns. Get there, put the thugs down, keep City Trust from hitting zero. An original fan-made swinging game — every pixel drawn in code.</p>
+    </div>
+  </div>
+
+  <div class="screen" id="overScreen" hidden>
+    <div class="card">
+      <div class="eyebrow" id="overKicker">THE CITY WENT DARK</div>
+      <h1 id="overTitle">SHIFT <span>OVER</span></h1>
+      <div class="sub" id="overSub">City Trust hit zero</div>
+      <div class="rule"></div>
+      <div class="tally">
+        <div><b id="fScore">0</b><span>SCORE</span></div>
+        <div><b id="fStopped">0</b><span>CRIMES</span></div>
+        <div><b id="fDowned">0</b><span>THUGS</span></div>
+        <div><b id="fBest">0</b><span>BEST SWING</span></div>
+      </div>
+      <button class="go" id="againBtn">GO AGAIN</button>
+    </div>
+  </div>
+
+  <div class="screen" id="pauseScreen" hidden>
+    <div class="card">
+      <div class="eyebrow">HANGING BY A THREAD</div>
+      <h1>PAUSED</h1>
+      <div class="sub">The city can wait a second</div>
+      <button class="go" id="resumeBtn">BACK TO WORK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   MAYOS MORALES — a hand-coded web-swinging sandbox
+   No images, no libraries: skyline, suit and physics are all math.
+   ============================================================ */
+
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+let VW = 0, VH = 0, DPR = 1;
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  VW = cv.clientWidth; VH = cv.clientHeight;
+  cv.width = Math.floor(VW * DPR); cv.height = Math.floor(VH * DPR);
+}
+window.addEventListener('resize', resize); resize();
+
+/* ---------- deterministic noise ---------- */
+function hash2(a, b){
+  let h = Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+
+/* ---------- world constants ---------- */
+const GROUND   = 1600;      // street surface
+const WORLD_W  = 26000;
+const SKY_LIMIT= -1500;
+const GRAV     = 0.62;
+const WEB_MAX  = 1050;
+const PR       = 15;        // player collision radius
+
+/* ---------- audio (tiny synth, no files) ---------- */
+let AC = null;
+function audio(){
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ } }
+  return AC;
+}
+function blip(type, freq, dur, vol, sweep){
+  const ac = audio(); if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, ac.currentTime);
+  if (sweep) o.frequency.exponentialRampToValueAtTime(Math.max(30, sweep), ac.currentTime + dur);
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0008, ac.currentTime + dur);
+  o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + dur);
+}
+let noiseBuf = null;
+function noise(dur, vol, freq, q){
+  const ac = audio(); if (!ac) return;
+  if (!noiseBuf){
+    noiseBuf = ac.createBuffer(1, ac.sampleRate * 0.5, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const s = ac.createBufferSource(); s.buffer = noiseBuf;
+  const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q || 1;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0008, ac.currentTime + dur);
+  s.connect(f).connect(g).connect(ac.destination); s.start(); s.stop(ac.currentTime + dur);
+}
+const SFX = {
+  thwip(){ noise(0.16, 0.16, 2600, 3); blip('sawtooth', 900, 0.1, 0.05, 320); },
+  miss(){ noise(0.1, 0.06, 1200, 2); },
+  punch(){ noise(0.13, 0.28, 260, 1.2); blip('square', 150, 0.1, 0.1, 50); },
+  slam(){ noise(0.3, 0.34, 130, 0.8); blip('sine', 90, 0.28, 0.16, 34); },
+  land(v){ noise(0.16, clamp(v / 60, .05, .28), 200, 0.9); },
+  zip(){ blip('sawtooth', 320, 0.22, 0.07, 1400); noise(0.2, 0.08, 1800, 2); },
+  venom(){ blip('sawtooth', 1400, 0.42, 0.12, 120); noise(0.42, 0.2, 3000, 1.5); },
+  hurt(){ blip('square', 240, 0.2, 0.12, 70); },
+  alarm(){ blip('triangle', 660, 0.16, 0.08); setTimeout(()=>blip('triangle', 880, 0.2, 0.08), 150); },
+  win(){ [660, 880, 1320].forEach((f, i) => setTimeout(() => blip('triangle', f, 0.18, 0.08), i * 90)); }
+};
+
+/* ---------- buildings ---------- */
+let buildings = [];
+function buildCity(){
+  buildings = [];
+  let x = -400;
+  let i = 0;
+  while (x < WORLD_W){
+    const w = Math.round(rnd(150, 380));
+    // Manhattan-ish rhythm: occasional tower spikes between mid-rises
+    const spike = hash2(i, 7) > 0.86;
+    const h = Math.round(spike ? rnd(1050, 1380) : rnd(260, 900));
+    const b = {
+      x, w, h, top: GROUND - h, i,
+      hue: 214 + hash2(i, 3) * 26,
+      shade: 0.16 + hash2(i, 11) * 0.16,
+      wCols: Math.max(2, Math.floor(w / 34)),
+      wRows: Math.max(2, Math.floor(h / 40)),
+      antenna: spike || hash2(i, 5) > 0.7,
+      tank: hash2(i, 9) > 0.55,
+      acs: Math.floor(hash2(i, 13) * 4),
+      sign: hash2(i, 17) > 0.78
+    };
+    buildings.push(b);
+    x += w + rnd(34, 120);
+    i++;
+  }
+}
+function buildingHit(x, y){
+  for (let i = 0; i < buildings.length; i++){
+    const b = buildings[i];
+    if (x >= b.x && x <= b.x + b.w && y >= b.top) return b;
+    if (b.x > x + 40) break;
+  }
+  return null;
+}
+function castWeb(ox, oy, dx, dy, maxLen){
+  const step = 7;
+  for (let t = 28; t < maxLen; t += step){
+    const x = ox + dx * t, y = oy + dy * t;
+    if (y > GROUND) return null;
+    if (x < -400 || x > WORLD_W) return null;
+    const b = buildingHit(x, y);
+    if (b){
+      // pull the anchor back to the surface for a clean stick
+      const bx = ox + dx * (t - step), by = oy + dy * (t - step);
+      return { x: bx, y: by, len: Math.hypot(bx - ox, by - oy), b };
+    }
+  }
+  return null;
+}
+
+/* ---------- entities ---------- */
+const player = {
+  x: 900, y: GROUND - 700, px: 900, py: GROUND - 700,
+  vx: 0, vy: 0, onGround: false, wall: 0, wallStick: 0,
+  face: 1, hp: 100, venom: 0, hurtAt: -999, lean: 0, anim: 0,
+  crouch: 0, punchT: 0, grabT: 0, grabTarget: null, dead: false,
+  airTime: 0, lastGroundY: 0
+};
+const web = { on: false, x: 0, y: 0, len: 0, life: 0, wob: 0 };
+let thugs = [], civilians = [], crimes = [], particles = [], streaks = [], cars = [];
+
+/* ---------- game state ---------- */
+const G = {
+  running: false, paused: false, t: 0,
+  score: 0, combo: 1, comboT: 0, stopped: 0, downed: 0,
+  trust: 100, bestSwing: 0, swingDist: 0, nextCrime: 3,
+  shake: 0, flash: 0, slowmo: 0
+};
+
+/* ---------- camera ---------- */
+const cam = { x: 0, y: 0, z: 1, tz: 1 };
+
+/* ---------- input ---------- */
+const keys = {};
+const mouse = { x: 0, y: 0, wx: 0, wy: 0, down: false, right: false };
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (k === ' ' || k === 'arrowup' || k === 'arrowdown') e.preventDefault();
+  if (k === 'p' || k === 'escape') togglePause();
+  if (k === 'f') tryGrapple();
+  if (k === 'e') venomStrike();
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('mousemove', e => {
+  const r = cv.getBoundingClientRect();
+  mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
+});
+cv.addEventListener('mousedown', e => {
+  audio();
+  if (e.button === 0){ mouse.down = true; shootWeb(); }
+  if (e.button === 2){ mouse.right = true; zipTo(); }
+});
+addEventListener('mouseup', e => {
+  if (e.button === 0){ mouse.down = false; releaseWeb(true); }
+  if (e.button === 2) mouse.right = false;
+});
+// touch: tap-and-hold to swing toward the touch point
+cv.addEventListener('touchstart', e => {
+  audio(); e.preventDefault();
+  const r = cv.getBoundingClientRect(), t = e.touches[0];
+  mouse.x = t.clientX - r.left; mouse.y = t.clientY - r.top;
+  updateMouseWorld(); mouse.down = true; shootWeb();
+}, { passive: false });
+cv.addEventListener('touchmove', e => {
+  const r = cv.getBoundingClientRect(), t = e.touches[0];
+  mouse.x = t.clientX - r.left; mouse.y = t.clientY - r.top;
+}, { passive: false });
+cv.addEventListener('touchend', e => { e.preventDefault(); mouse.down = false; releaseWeb(true); }, { passive: false });
+
+function updateMouseWorld(){
+  mouse.wx = cam.x + (mouse.x - VW / 2) / cam.z;
+  mouse.wy = cam.y + (mouse.y - VH / 2) / cam.z;
+}
+
+/* ---------- web actions ---------- */
+function shootWeb(){
+  if (!G.running || G.paused || player.dead) return;
+  updateMouseWorld();
+  let dx = mouse.wx - player.x, dy = mouse.wy - player.y;
+  const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+
+  // a thug in the line of fire gets yanked instead
+  for (const t of thugs){
+    if (t.hp <= 0) continue;
+    const tx = t.x - player.x, ty = (t.y - 22) - player.y;
+    const dist = Math.hypot(tx, ty);
+    if (dist > 620 || dist < 40) continue;
+    const dot = (tx * dx + ty * dy) / dist;
+    if (dot > 0.965){ yank(t); return; }
+  }
+
+  const hit = castWeb(player.x, player.y, dx, dy, WEB_MAX);
+  if (hit){
+    web.on = true; web.x = hit.x; web.y = hit.y;
+    web.len = Math.max(70, hit.len); web.life = 0; web.wob = 0;
+    G.swingDist = 0;
+    SFX.thwip();
+    for (let i = 0; i < 6; i++) spark(hit.x, hit.y, rnd(-2, 2), rnd(-2, 2), '#ffffff', 16);
+  } else {
+    SFX.miss();
+    web.miss = { x: player.x + dx * WEB_MAX, y: player.y + dy * WEB_MAX, t: 8 };
+  }
+}
+function releaseWeb(boost){
+  if (!web.on) return;
+  web.on = false;
+  if (boost){
+    const sp = Math.hypot(player.vx, player.vy);
+    if (sp > 6){ player.vx *= 1.05; player.vy -= 1.8; }
+  }
+  if (G.swingDist > G.bestSwing) G.bestSwing = Math.round(G.swingDist);
+  if (G.swingDist > 900){
+    addScore(Math.round(G.swingDist / 12), 'LONG SWING');
+  }
+}
+function zipTo(){
+  if (!G.running || G.paused || player.dead) return;
+  updateMouseWorld();
+  let dx = mouse.wx - player.x, dy = mouse.wy - player.y;
+  const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+  const hit = castWeb(player.x, player.y, dx, dy, WEB_MAX);
+  if (!hit){ SFX.miss(); return; }
+  const power = clamp(hit.len / 26, 8, 34);
+  player.vx = dx * power; player.vy = dy * power - 3;
+  player.onGround = false; player.wallStick = 0;
+  web.on = false;
+  web.zip = { x: hit.x, y: hit.y, t: 12 };
+  SFX.zip();
+}
+function yank(t){
+  t.hp -= 34; t.stun = 1.1;
+  t.vx = (player.x - t.x) * 0.055; t.vy = -9;
+  web.pull = { x: t.x, y: t.y - 22, t: 10 };
+  SFX.thwip(); SFX.punch();
+  G.shake = Math.max(G.shake, 6);
+  for (let i = 0; i < 12; i++) spark(t.x, t.y - 20, rnd(-4, 4), rnd(-6, 1), '#ffffff', 20);
+  if (t.hp <= 0) knockOut(t, 'WEB YANK');
+  else addScore(15, 'YANK');
+}
+
+/* ---------- combat ---------- */
+function nearestThug(range){
+  let best = null, bd = range;
+  for (const t of thugs){
+    if (t.hp <= 0) continue;
+    const d = Math.hypot(t.x - player.x, (t.y - 22) - player.y);
+    if (d < bd){ bd = d; best = t; }
+  }
+  return best;
+}
+function tryGrapple(){
+  if (!G.running || G.paused || player.dead || player.grabT > 0) return;
+  const t = nearestThug(96);
+  if (!t) return;
+  player.grabT = 0.42; player.grabTarget = t;
+  player.face = t.x > player.x ? 1 : -1;
+  t.grabbed = true; t.stun = 1.6;
+  web.on = false;
+  SFX.punch();
+}
+function finishGrapple(){
+  const t = player.grabTarget;
+  player.grabTarget = null;
+  if (!t || t.hp <= 0) return;
+  t.hp -= 70; t.vx = player.face * 9; t.vy = -6; t.stun = 2.4;
+  SFX.slam(); G.shake = Math.max(G.shake, 11); G.flash = 0.22;
+  for (let i = 0; i < 20; i++) spark(t.x, t.y - 10, rnd(-6, 6), rnd(-7, 2), i % 3 ? '#FFC46B' : '#ffffff', 26);
+  if (t.hp <= 0) knockOut(t, 'GRAPPLE SLAM'); else addScore(30, 'WRESTLED');
+  player.venom = Math.min(100, player.venom + 14);
+}
+function diveSlam(t, speed){
+  t.hp -= 80; t.vx = player.vx * 0.4; t.vy = -7; t.stun = 3;
+  player.vx *= 0.3; player.vy = -8;
+  SFX.slam(); G.shake = Math.max(G.shake, 14); G.flash = 0.3;
+  for (let i = 0; i < 26; i++) spark(t.x, t.y - 8, rnd(-8, 8), rnd(-9, 2), i % 2 ? '#37E6FF' : '#ffffff', 30);
+  player.venom = Math.min(100, player.venom + 20);
+  if (t.hp <= 0) knockOut(t, speed > 26 ? 'METEOR SLAM' : 'DIVE SLAM');
+}
+function venomStrike(){
+  if (!G.running || G.paused || player.dead || player.venom < 100) return;
+  player.venom = 0; G.flash = 0.5; G.shake = 14; SFX.venom();
+  for (let i = 0; i < 70; i++){
+    const a = Math.random() * Math.PI * 2, s = rnd(3, 15);
+    spark(player.x, player.y, Math.cos(a) * s, Math.sin(a) * s, '#37E6FF', 40);
+  }
+  let hits = 0;
+  for (const t of thugs){
+    if (t.hp <= 0) continue;
+    const d = Math.hypot(t.x - player.x, (t.y - 22) - player.y);
+    if (d < 340){
+      t.hp -= 120; t.stun = 4;
+      t.vx = Math.sign(t.x - player.x || 1) * 13; t.vy = -11;
+      hits++; if (t.hp <= 0) knockOut(t, 'VENOM BLAST');
+    }
+  }
+  if (hits) addScore(60 * hits, 'VENOM STRIKE');
+  else toast('VENOM STRIKE', 'venom');
+}
+function knockOut(t, why){
+  t.hp = 0; t.ko = 1; G.downed++;
+  addScore(100, why);
+  G.combo = Math.min(9, G.combo + 1); G.comboT = 4;
+  player.venom = Math.min(100, player.venom + 16);
+  for (let i = 0; i < 14; i++) spark(t.x, t.y - 16, rnd(-4, 4), rnd(-7, -1), '#FFC46B', 28);
+}
+function hurtPlayer(dmg, fromX){
+  if (G.t - player.hurtAt < 0.7 || player.dead) return;
+  player.hurtAt = G.t; player.hp -= dmg;
+  player.vx += Math.sign(player.x - fromX || 1) * 7; player.vy = -6;
+  G.shake = Math.max(G.shake, 9); G.flash = 0.18; SFX.hurt();
+  G.combo = 1; G.comboT = 0;
+  if (player.hp <= 0){ player.hp = 0; downPlayer(); }
+}
+function downPlayer(){
+  player.dead = true; player.deadT = 0; web.on = false;
+  G.trust = Math.max(0, G.trust - 15);
+  toast('KNOCKED OUT', 'red');
+}
+
+/* ---------- crimes ---------- */
+const CRIME_KINDS = [
+  { name: 'MUGGING',        thugs: 2, hp: 100, time: 55 },
+  { name: 'ARMED ROBBERY',  thugs: 3, hp: 120, time: 60 },
+  { name: 'CAR JACKING',    thugs: 3, hp: 110, time: 50 },
+  { name: 'GANG BRAWL',     thugs: 4, hp: 130, time: 70 },
+  { name: 'SHAKEDOWN',      thugs: 3, hp: 140, time: 60 }
+];
+function spawnCrime(){
+  const kind = CRIME_KINDS[Math.floor(Math.random() * CRIME_KINDS.length)];
+  // pick a street spot a comfortable swing away from the player
+  let cx = player.x + (Math.random() < 0.5 ? -1 : 1) * rnd(1800, 4600);
+  cx = clamp(cx, 600, WORLD_W - 600);
+  const crime = { x: cx, kind, time: kind.time, max: kind.time, thugs: [], done: false, t: 0 };
+  const n = kind.thugs + (G.stopped > 3 ? 1 : 0);
+  for (let i = 0; i < n; i++){
+    const t = {
+      x: cx + rnd(-110, 110), y: GROUND, vx: 0, vy: 0,
+      hp: kind.hp, maxhp: kind.hp, stun: 0, ko: 0, cd: rnd(0.4, 1.6),
+      face: 1, anim: Math.random() * 6, crime, grabbed: false,
+      tint: hash2(i * 31 + Math.floor(cx), 3)
+    };
+    thugs.push(t); crime.thugs.push(t);
+  }
+  civilians.push({ x: cx + rnd(-40, 40), y: GROUND, crime, flee: 0, anim: Math.random() * 6, face: 1 });
+  crimes.push(crime);
+  SFX.alarm();
+  showAlert(kind.name);
+}
+function updateCrimes(dt){
+  for (let i = crimes.length - 1; i >= 0; i--){
+    const c = crimes[i];
+    c.t += dt;
+    const alive = c.thugs.filter(t => t.hp > 0).length;
+    if (alive === 0 && !c.done){
+      c.done = true; c.fade = 1.2;
+      G.stopped++; G.trust = Math.min(100, G.trust + 9);
+      addScore(250, 'CRIME STOPPED');
+      SFX.win();
+      const civ = civilians.find(v => v.crime === c);
+      if (civ) civ.saved = 1.6;
+      continue;
+    }
+    if (!c.done){
+      c.time -= dt;
+      if (c.time <= 0){
+        c.done = true; c.failed = true; c.fade = 1.2;
+        G.trust = Math.max(0, G.trust - 22);
+        toast('CRIME GOT AWAY', 'red');
+        for (const t of c.thugs) t.leaving = true;
+        const civ = civilians.find(v => v.crime === c);
+        if (civ) civ.flee = 1;
+      }
+    }
+    if (c.done){
+      c.fade -= dt;
+      if (c.fade <= -6) crimes.splice(i, 1);
+    }
+  }
+  if (crimes.filter(c => !c.done).length < 1 + Math.floor(G.stopped / 4)){
+    G.nextCrime -= dt;
+    if (G.nextCrime <= 0){ spawnCrime(); G.nextCrime = rnd(9, 16); }
+  }
+}
+
+/* ---------- particles ---------- */
+function spark(x, y, vx, vy, color, life){
+  particles.push({ x, y, vx, vy, color, life, max: life, g: 0.24 });
+}
+function dust(x, y, n, color){
+  for (let i = 0; i < n; i++) particles.push({
+    x: x + rnd(-14, 14), y, vx: rnd(-3.4, 3.4), vy: rnd(-3.2, -.4),
+    color: color || '#5A6690', life: rnd(14, 30), max: 30, g: 0.08, soft: 1
+  });
+}
+function updateParticles(){
+  for (let i = particles.length - 1; i >= 0; i--){
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += p.g; p.vx *= 0.985; p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = streaks.length - 1; i >= 0; i--){
+    streaks[i].life--; if (streaks[i].life <= 0) streaks.splice(i, 1);
+  }
+}
